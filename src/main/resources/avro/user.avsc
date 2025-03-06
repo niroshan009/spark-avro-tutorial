@@ -1,0 +1,48 @@
+{
+    "name": "GeneratedAvroSchemaTest",
+    "namespace": "com.kd.generated.avro.schema",
+    "doc": "Here you can give more details about the use of this schema",
+    "type": "record",
+    "fields": [
+        {
+            "name": "id",
+            "type": "long"
+        },
+        {
+            "name": "first_name",
+            "type": "string"
+        },
+        {
+            "name": "last_name",
+            "type": "string"
+        },
+        {
+            "name": "age",
+            "type": "long"
+        },
+        {
+            "name": "birth_date",
+            "type": "string"
+        },
+        {
+            "name": "address",
+            "type": {
+                "type":"array",
+                "items": {
+                    "type": "record",
+                    "name": "address",
+                    "fields": [
+                        {
+                            "name": "city",
+                            "type": "string"
+                        },
+                        {
+                            "name": "living_cost",
+                            "type": "long"
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
