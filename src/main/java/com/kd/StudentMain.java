@@ -84,16 +84,16 @@ public class StudentMain {
         studentDataset.show(false);
 
         Dataset<Row> modifiedData = studentDataset
-                .withColumn("subjects", struct(
-                        col("subjects.name"),
-                        col("subjects.subject_rank"),
-                        col("subjects.grade"),
-                        col("rating").alias("rating")
+                .withColumn("subjects",
+                        struct(col("subjects.name"),
+                                col("subjects.subject_rank"),
+                                col("subjects.grade"),
+                                col("rating").alias("rating")
                 ))
-                .groupBy("id", "name", "education.school")
+                .groupBy("id", "name", "education.school", "education.school_rank")
                 .agg(collect_list("subjects").alias("subjects"))
                 .groupBy("id", "name")
-                .agg(collect_list(struct(col("school"), col("subjects")))).alias("education");
+                .agg(collect_list(struct(col("school"), col("school_rank"), col("subjects")))).alias("education");
 
 
         modifiedData.show(false);
