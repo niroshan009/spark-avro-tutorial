@@ -1,38 +1,28 @@
 package com.kd;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kd.generated.avro.schema.GeneratedAvroSchemaTest;
+
 import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileReader;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.Encoder;
-import org.apache.hadoop.yarn.webapp.ToJSON;
 import org.apache.spark.SparkConf;
-import org.apache.spark.SparkConf$;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.*;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.avro.SchemaConverters;
 import org.apache.spark.sql.types.*;
-import scala.Function1;
+
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import org.apache.avro.Schema;
+
 import org.apache.avro.Schema.Parser;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.avro.SchemaConverters;
+
 
 import static org.apache.spark.sql.functions.*;
 
@@ -140,7 +130,7 @@ public class Main {
                 )
 
                 .select(
-                       columnsToSelect
+                       col("*")
                 )
                 .show(false);
 
