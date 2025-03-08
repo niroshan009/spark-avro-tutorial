@@ -32,12 +32,10 @@ public class StudentMain {
     public static void main(String[] args) throws IOException {
 
 
-
-
         Logger.getLogger("org.apache").setLevel(Level.WARN);
 
         String schemaFilePath = "src/main/resources/avro/student.avsc";
-        String avroFile ="src/main/resources/student.avro";
+        String avroFile = "src/main/resources/student.avro";
         SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
         JavaSparkContext sc = new JavaSparkContext(conf);
         SQLContext sqlContext = new SQLContext(sc);
@@ -49,83 +47,78 @@ public class StudentMain {
         StructType sparkSchema = (StructType) SchemaConverters.toSqlType(avroSchema).dataType();
 
 
-
         System.out.println(Paths.get(schemaFilePath).toUri().getPath());
 
-        Dataset<Row> avroData = sparkSession.read().format("avro")
+        Dataset<Row> studentDataset = sparkSession.read().format("avro")
                 .schema(sparkSchema)
-                 .load(avroFile);
-//
-        avroData.show(false);
+                .load(avroFile);
 
-        List<String> columnNames = Arrays.asList("education", "education.subjects");
+
+        studentDataset.show(false);
+
+        Dataset<Row> referenceDataset = getReferenceDataset(sparkSession);
 
         Map<String, Column> columns = new HashMap<>();
         columns.put("education", explode(col("education")));
         columns.put("subjects", explode(col("education.subjects")));
 
-        for(Map.Entry<String, Column> entry : columns.entrySet()) {
-            avroData = avroData.withColumn(entry.getKey(), entry.getValue());
+        for (Map.Entry<String, Column> entry : columns.entrySet()) {
+            studentDataset = studentDataset.withColumn(entry.getKey(), entry.getValue());
 
         }
 
-
-        avroData.show(false);
-
+        referenceDataset.show(false);
 
 
+        studentDataset = studentDataset
+                .join(
+                        referenceDataset,
+                        functions.expr("education.school_rank = school_rank and subjects.subject_rank = subject_rank").cast("boolean"),
+                        "left"
+                )
+
+                .select(
+                        col("*")
+                );
+
+        studentDataset.show(false);
+
+        Dataset<Row> modifiedData = studentDataset
+                .withColumn("subjects", struct(
+                        col("subjects.name"),
+                        col("subjects.subject_rank"),
+                        col("subjects.grade"),
+                        col("rating").alias("rating")
+                ))
+                .groupBy("id", "name", "education.school")
+                .agg(collect_list("subjects").alias("subjects"))
+                .groupBy("id", "name")
+                .agg(collect_list(struct(col("school"), col("subjects")))).alias("education");
 
 
+        modifiedData.show(false);
 
 
+    }
 
 
+    private static Dataset<Row> getReferenceDataset(SparkSession sparkSession) {
+        StructType struct = new StructType(new StructField[]{
+                new StructField("school_rank", DataTypes.StringType, false, Metadata.empty()),
+                new StructField("subject_rank", DataTypes.IntegerType, false, Metadata.empty()),
+                new StructField("rating", DataTypes.StringType, false, Metadata.empty())
 
+        });
 
+        List<Row> cityCodeList = Arrays.asList(
+                RowFactory.create("A", 1, "Excellent"),
+                RowFactory.create("A", 2, "Above Average"),
+                RowFactory.create("A", 3, "Poor"),
+                RowFactory.create("B", 1, "Good"),
+                RowFactory.create("B", 2, "Average"),
+                RowFactory.create("B", 3, "Poor"));
 
-
-
-//        avroData = avroData.select(col("id"), col("name"), col("education.school"), col("education.school_rank"), col("subjects.name").alias("sub_name"), col("subjects.subject_rank"));
-//
-//        avroData.show(false);
-//
-//
-//
-//        avroData.groupBy("id")
-//                                .pivot("school")
-//                .pivot("sub_name")    // Pivot by school name
-//                                .agg(
-//                                        first("school_rank").alias("school_rank"), // Get the school rank
-//                                        first("sub_name").alias("sub_name"), // Get the subject name
-//                                        first("subject_rank").alias("subject_rank") // Get the subject rank
-//                                )
-//
-//                .show(false);
-
-
-
-
-
-//        avroData
-//
-//                .withColumn( )
-//                .withColumn("education", explode(col("education")))  // First explode
-//                .withColumn("subjects", explode(col("education.subjects"))) // Second explode
-//
-//                .selectExpr("id", "name", "education.school", "education.school_rank", "subjects.name as subject_name")
-//                .show(false);
-
-
-
-
-//        avroData.selectExpr("id","name","explode(education) as education")
-//                .withColumn("school", col("education.school"))
-//                .withColumn("rank", col("education.school_rank"))
-//                .withColumn("subject", col("subjects.name"))
-//                .withColumn("subject_name", col("subjects.name"))
-//                .select("name", "school" , "rank", "subject_name")
-//                .show(false);
-
-
+        Dataset<Row> cityCode = sparkSession.createDataFrame(cityCodeList, struct);
+        return cityCode;
     }
 }

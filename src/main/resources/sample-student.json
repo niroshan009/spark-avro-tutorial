@@ -1,0 +1,58 @@
+{
+    "id": 1234,
+    "name": "Kamal",
+    "education": [
+        {
+            "school": "School 1",
+            "school_rank": "A",
+            "subjects": [
+                {
+                    "name": "Maths",
+                    "subject_rank": 1,
+                    "grade": "A"
+                },
+                {
+                    "name": "Science",
+                    "subject_rank": 1,
+                    "grade": "B"
+                },
+                {
+                    "name": "English",
+                    "subject_rank": 2,
+                    "grade": "F"
+                },
+                {
+                    "name": "Religion",
+                    "subject_rank": 3,
+                    "grade": "C"
+                }
+            ]
+        },
+        {
+            "school": "School 2",
+            "school_rank": "B",
+            "subjects": [
+                {
+                    "name": "Maths",
+                    "subject_rank": 1,
+                    "grade": "B"
+                },
+                {
+                    "name": "Science",
+                    "subject_rank": 1,
+                    "grade": "B"
+                },
+                {
+                    "name": "English",
+                    "subject_rank": 2,
+                    "grade": "C"
+                },
+                {
+                    "name": "Religion",
+                    "subject_rank": 3,
+                    "grade": "C"
+                }
+            ]
+        }
+    ]
+}
