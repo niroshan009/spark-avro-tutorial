@@ -1,4 +1,4 @@
-package com.kd;
+package com.kd.amend;
 
 import java.io.Serializable;
 

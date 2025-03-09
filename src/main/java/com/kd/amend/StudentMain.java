@@ -1,4 +1,4 @@
-package com.kd;
+package com.kd.amend;
 
 import org.apache.avro.Schema;
 import org.apache.spark.SparkConf;
