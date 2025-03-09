@@ -68,7 +68,6 @@ public class StudentMain {
             studentDataset = studentDataset.withColumn(entry.getKey(), entry.getValue());
         }
 
-
         referenceDataset.show(false);
 
         // expression to do the join with reference data
@@ -81,18 +80,11 @@ public class StudentMain {
                 .select(col("*"));
 
 
-
-        // construct the subject column to be added later in the
+        // amend the values based on the external configuration
         Dataset<Row> columnsToSelect = getSelectColumn(sparkSession);
+        List<AmendConfiguration> groupLogicConfigList = columnsToSelect.as(Encoders.bean(AmendConfiguration.class)).collectAsList();
 
-
-        studentDataset = studentDataset
-                .withColumn("subjects",
-                        struct(col("subjects.name"),
-                                col("subjects.subject_rank"),
-                                col("subjects.grade"),
-                                col("rating").alias("rating")
-                        ));
+        studentDataset = amendNewValueAndConstruct(studentDataset, groupLogicConfigList);
 
 
         // Reconstructing the original object with added values
@@ -101,17 +93,15 @@ public class StudentMain {
         // this will be used for reconstruct the objects
         Dataset<Row> groupAggDs = getGroupByDS(sparkSession);
         groupAggDs.show(false);
-
-        // convert to custom object type
         List<GroupLogicConfig> groupLogicConfigs = groupAggDs.as(Encoders.bean(GroupLogicConfig.class)).collectAsList();
 
-        Dataset<Row> groupDataset = getGroupedDataset(studentDataset, groupLogicConfigs);
+        Dataset<Row> groupDataset = reconstructTheObject(studentDataset, groupLogicConfigs);
         groupDataset.show(false);
 
     }
 
 
-    private static Dataset<Row> getGroupedDataset(Dataset<Row> rowDataset, List<GroupLogicConfig> groupLogicConfigList) {
+    private static Dataset<Row> reconstructTheObject(Dataset<Row> rowDataset, List<GroupLogicConfig> groupLogicConfigList) {
 
         for (GroupLogicConfig groupLogicConfig : groupLogicConfigList) {
 
@@ -143,7 +133,6 @@ public class StudentMain {
         return rowDataset;
     }
 
-
     private static Dataset<Row> getGroupByDS(SparkSession sparkSession) {
 
         StructType struct = new StructType(new StructField[]{
@@ -168,7 +157,7 @@ public class StudentMain {
                 new StructField("groupColumns", DataTypes.StringType, false, Metadata.empty())
         });
 
-        List<Row> columnsToSelectList = Arrays.asList(
+        List<Row> columnsToSelectList = List.of(
                 RowFactory.create("subjects", "subjects.name:subjects.name;subjects.subject_rank:subjects.subject_rank;subjects.grade:subjects.grade;rating:rating")
         );
 
@@ -194,5 +183,30 @@ public class StudentMain {
                 RowFactory.create("B", 3, "Poor"));
 
         return sparkSession.createDataFrame(cityCodeList, struct);
+    }
+
+    private static Dataset<Row> amendNewValueAndConstruct(Dataset<Row> dataset, List<AmendConfiguration> amendConfigurationList) {
+
+        for (AmendConfiguration amendConfiguration : amendConfigurationList) {
+
+            String structColumn = amendConfiguration.getColumnToSelect();
+
+            Column[] groupByColumns = Arrays.stream(amendConfiguration.getGroupColumns().split(";"))
+                    .map(e -> {
+
+                        String[] colAndAlias = e.split(":");
+                        String col = colAndAlias[0];
+                        String alias = colAndAlias[1];
+
+                        return functions.col(col).alias(alias);
+
+                    })
+                    .toArray(Column[]::new);
+
+            dataset = dataset.withColumn(structColumn, struct(groupByColumns));
+
+        }
+
+        return dataset;
     }
 }
