@@ -43,7 +43,7 @@ public class StudentMain {
 
         Schema avroSchema = new Parser().parse(new File(schemaFilePath));
 
-        // Step 2: Convert the Avro schema to Spark StructType
+        // Convert the Avro schema to Spark StructType
         StructType sparkSchema = (StructType) SchemaConverters.toSqlType(avroSchema).dataType();
 
 
@@ -58,7 +58,7 @@ public class StudentMain {
 
         Dataset<Row> referenceDataset = getReferenceDataset(sparkSession);
 
-        // exploding columns the child objects to add values
+        // Stage 1: exploding columns the child objects to add values
         Map<String, Column> columns = new HashMap<>();
         columns.put("education", explode(col("education")));
         columns.put("subjects", explode(col("education.subjects")));
@@ -70,7 +70,7 @@ public class StudentMain {
 
         referenceDataset.show(false);
 
-        // expression to do the join with reference data
+        // Stage 2: expression to do the join with reference data
         studentDataset = studentDataset
                 .join(
                         referenceDataset,
@@ -80,14 +80,14 @@ public class StudentMain {
                 .select(col("*"));
 
 
-        // amend the values based on the external configuration
+        // Stage 3: amend the values based on the external configuration
         Dataset<Row> columnsToSelect = getSelectColumn(sparkSession);
         List<AmendConfiguration> groupLogicConfigList = columnsToSelect.as(Encoders.bean(AmendConfiguration.class)).collectAsList();
 
         studentDataset = amendNewValueAndConstruct(studentDataset, groupLogicConfigList);
 
 
-        // Reconstructing the original object with added values
+        // Stage 4: Reconstructing the original object with added values
 
         // group and aggregation dataset which will fetch from outside
         // this will be used for reconstruct the objects
@@ -174,7 +174,7 @@ public class StudentMain {
 
         });
 
-        List<Row> cityCodeList = Arrays.asList(
+        List<Row> grandRanking = Arrays.asList(
                 RowFactory.create("A", 1, "Excellent"),
                 RowFactory.create("A", 2, "Above Average"),
                 RowFactory.create("A", 3, "Poor"),
@@ -182,7 +182,7 @@ public class StudentMain {
                 RowFactory.create("B", 2, "Average"),
                 RowFactory.create("B", 3, "Poor"));
 
-        return sparkSession.createDataFrame(cityCodeList, struct);
+        return sparkSession.createDataFrame(grandRanking, struct);
     }
 
     private static Dataset<Row> amendNewValueAndConstruct(Dataset<Row> dataset, List<AmendConfiguration> amendConfigurationList) {
