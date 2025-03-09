@@ -58,49 +58,124 @@ public class StudentMain {
 
         Dataset<Row> referenceDataset = getReferenceDataset(sparkSession);
 
+        // exploding columns the child objects to add values
         Map<String, Column> columns = new HashMap<>();
         columns.put("education", explode(col("education")));
         columns.put("subjects", explode(col("education.subjects")));
 
+        // exploding the actual object to columns
         for (Map.Entry<String, Column> entry : columns.entrySet()) {
             studentDataset = studentDataset.withColumn(entry.getKey(), entry.getValue());
-
         }
+
 
         referenceDataset.show(false);
 
-
+        // expression to do the join with reference data
         studentDataset = studentDataset
                 .join(
                         referenceDataset,
                         functions.expr("education.school_rank = school_rank and subjects.subject_rank = subject_rank").cast("boolean"),
                         "left"
                 )
+                .select(col("*"));
 
-                .select(
-                        col("*")
-                );
 
-        studentDataset.show(false);
 
-        Dataset<Row> modifiedData = studentDataset
+        // construct the subject column to be added later in the
+        Dataset<Row> columnsToSelect = getSelectColumn(sparkSession);
+
+
+        studentDataset = studentDataset
                 .withColumn("subjects",
                         struct(col("subjects.name"),
                                 col("subjects.subject_rank"),
                                 col("subjects.grade"),
                                 col("rating").alias("rating")
-                ))
-                .groupBy("id", "name", "education.school", "education.school_rank")
-                .agg(collect_list("subjects").alias("subjects"))
-                .groupBy("id", "name")
-                .agg(collect_list(struct(col("school"), col("school_rank"), col("subjects")))).alias("education");
+                        ));
 
 
-        modifiedData.show(false);
+        // Reconstructing the original object with added values
 
+        // group and aggregation dataset which will fetch from outside
+        // this will be used for reconstruct the objects
+        Dataset<Row> groupAggDs = getGroupByDS(sparkSession);
+        groupAggDs.show(false);
+
+        // convert to custom object type
+        List<GroupLogicConfig> groupLogicConfigs = groupAggDs.as(Encoders.bean(GroupLogicConfig.class)).collectAsList();
+
+        Dataset<Row> groupDataset = getGroupedDataset(studentDataset, groupLogicConfigs);
+        groupDataset.show(false);
 
     }
 
+
+    private static Dataset<Row> getGroupedDataset(Dataset<Row> rowDataset, List<GroupLogicConfig> groupLogicConfigList) {
+
+        for (GroupLogicConfig groupLogicConfig : groupLogicConfigList) {
+
+
+            Column[] groupByColumns = Arrays.stream(groupLogicConfig.getGroupColumns().split(","))
+                    .map(functions::col)
+                    .toArray(Column[]::new);
+
+            Column[] aggColumns = Arrays.stream(groupLogicConfig.getAggregateColumns().split(","))
+                    .map(functions::col)
+                    .toArray(Column[]::new);
+
+
+            Column aggColumn;
+
+            if (groupLogicConfig.getStruct()) { // if it is a struct (object type to be created)
+                aggColumn = collect_list(struct(aggColumns)).alias(groupLogicConfig.getAlias());
+            } else {
+                aggColumn = collect_list(groupLogicConfig.getAggregateColumns()).alias(groupLogicConfig.getAlias());
+            }
+
+            rowDataset = rowDataset
+                    .groupBy(groupByColumns)
+                    .agg(aggColumn);
+
+
+        }
+
+        return rowDataset;
+    }
+
+
+    private static Dataset<Row> getGroupByDS(SparkSession sparkSession) {
+
+        StructType struct = new StructType(new StructField[]{
+                new StructField("order", DataTypes.IntegerType, false, Metadata.empty()),
+                new StructField("groupColumns", DataTypes.StringType, false, Metadata.empty()),
+                new StructField("aggregateColumns", DataTypes.StringType, false, Metadata.empty()),
+                new StructField("struct", DataTypes.BooleanType, false, Metadata.empty()),
+                new StructField("alias", DataTypes.StringType, true, Metadata.empty())
+        });
+
+        List<Row> groupByAggColList = Arrays.asList(
+                RowFactory.create(1, "id,name,education.school,education.school_rank", "subjects", false, "subjects"),
+                RowFactory.create(2, "id,name", "school,school_rank,subjects", true, "education")
+        );
+
+        return sparkSession.createDataFrame(groupByAggColList, struct);
+    }
+
+    private static Dataset<Row> getSelectColumn(SparkSession sparkSession) {
+        StructType struct = new StructType(new StructField[]{
+                new StructField("columnToSelect", DataTypes.StringType, false, Metadata.empty()),
+                new StructField("groupColumns", DataTypes.StringType, false, Metadata.empty())
+        });
+
+        List<Row> columnsToSelectList = Arrays.asList(
+                RowFactory.create("subjects", "subjects.name:subjects.name;subjects.subject_rank:subjects.subject_rank;subjects.grade:subjects.grade;rating:rating")
+        );
+
+        return sparkSession.createDataFrame(columnsToSelectList, struct);
+
+
+    }
 
     private static Dataset<Row> getReferenceDataset(SparkSession sparkSession) {
         StructType struct = new StructType(new StructField[]{
@@ -118,7 +193,6 @@ public class StudentMain {
                 RowFactory.create("B", 2, "Average"),
                 RowFactory.create("B", 3, "Poor"));
 
-        Dataset<Row> cityCode = sparkSession.createDataFrame(cityCodeList, struct);
-        return cityCode;
+        return sparkSession.createDataFrame(cityCodeList, struct);
     }
 }
